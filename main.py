@@ -1,5 +1,4 @@
 import asyncio
-import argparse
 import time
 import numpy as np
 import velodyne_decoder as vd
@@ -8,7 +7,6 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from threading import Thread, Lock
 from collections import deque
-import json
 import socket
 
 scan_buffer = deque(maxlen=3) #automatic memory management
@@ -35,7 +33,6 @@ def streamAll(port, data):
                     total_points = sum(len(s) for s in scan_buffer)
                     has_new_data = True
                 # time.sleep(0.1)
-            print(f"\nPCAP complete: {scan_count} scans")
         except Exception as e:
             print(f"PCAP error: {e}")
     elif port:
@@ -68,9 +65,6 @@ def streamAll(port, data):
                             scan_buffer.append(points)
                             total_points = sum(len(s) for s in scan_buffer)
                             has_new_data = True
-                    if packet_count % 200 == 0:
-                        print(f"\r  Packets: {packet_count} | Scans: {scan_count}", 
-                              end='', flush=True)
 
             except Exception as e:
                 if "TimePair" not in str(e):
@@ -97,12 +91,30 @@ async def endpoint(websocket: WebSocket):
     global has_new_data
     await websocket.accept()
     print("Client connected")
-    await websocket.send_text('world')
-    await asyncio.sleep(5)
+    while True:
+        await websocket.send_text('world')
+        await asyncio.sleep(5)
     
 def main():
+    t = Thread(target=streamAll(port=None, data='./data.pcap'), daemon=True)
+    t.start()
+    
     uvicorn.run(app=app, host="0.0.0.0", port=8000)
-    # streamAll(None, data='./data.pcap')
+    
     
 if __name__ == "__main__":
     main()
+    
+    """
+        def start_streaming(self):
+        self.running = True
+        if self.pcap_file:
+            t = Thread(target=self._stream_pcap_thread, daemon=True)
+        elif self.bag_file:
+            t = Thread(target=self._read_bag_thread, daemon=True)
+        else:
+            t = Thread(target=self._stream_udp_thread, daemon=True)
+        t.start()
+        print("Started streaming thread")
+    """
+    
