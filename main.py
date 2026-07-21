@@ -13,7 +13,9 @@ import socket
 
 scan_buffer = deque(maxlen=3) #automatic memory management
 data_lock = Lock()
+running = False
 has_new_data = False
+scan_count = 0
 
 config = vd.Config()
 config.timestamp_first_packet = True
@@ -25,10 +27,15 @@ def streamAll(port, data):
         print(f"Streaming from PCAP: {data}")
         try:
             for stamp, points in vd.read_pcap(pcap_file=data, config=config):
+                if not running:
+                    break
+                scan_count += 1
                 with data_lock:
                     scan_buffer.append(points)
+                    total_points = sum(len(s) for s in scan_buffer)
                     has_new_data = True
-                time.sleep(10)
+                # time.sleep(0.1)
+            print(f"\nPCAP complete: {scan_count} scans")
         except Exception as e:
             print(f"PCAP error: {e}")
     elif port:
@@ -76,6 +83,7 @@ def streamAll(port, data):
 
 
 app = FastAPI()
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -89,23 +97,12 @@ async def endpoint(websocket: WebSocket):
     global has_new_data
     await websocket.accept()
     print("Client connected")
-    # while True:
-    #     if has_new_data:
-    #         with data_lock:
-    #             try:
-    #                 message = np.concatenate(list(scan_buffer))
-    #                 has_new_data = False
-    #                 print()
-    #                 await websocket.send_text(message['x'])
-    #                 await asyncio.sleep(5)
-    #             except Exception as e:
-    #                 print(f"Error: {e}")
-    #                 continue
+    await websocket.send_text('world')
+    await asyncio.sleep(5)
     
 def main():
     uvicorn.run(app=app, host="0.0.0.0", port=8000)
-    # streamAll(port=None, data='./data.pcap')
-    
+    # streamAll(None, data='./data.pcap')
     
 if __name__ == "__main__":
     main()
